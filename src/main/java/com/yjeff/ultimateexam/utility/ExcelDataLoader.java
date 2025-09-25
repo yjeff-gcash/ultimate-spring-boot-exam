@@ -5,6 +5,7 @@ import com.yjeff.ultimateexam.repository.QuestionRepository;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
+@Order(1)
 public class ExcelDataLoader implements CommandLineRunner {
 
     private final QuestionRepository questionRepository;
@@ -28,7 +30,9 @@ public class ExcelDataLoader implements CommandLineRunner {
     public void run(String... args) throws Exception {
         questionRepository.deleteAll();
 
-        ClassPathResource resource = new ClassPathResource("nb.xlsx");
+        DataFormatter dataFormatter = new DataFormatter();
+
+        ClassPathResource resource = new ClassPathResource("questions.xlsx");
         try (InputStream inputStream = resource.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
 
@@ -43,22 +47,22 @@ public class ExcelDataLoader implements CommandLineRunner {
                 Row row = rowIterator.next();
                 if (row.getCell(0) == null) continue;
 
-                String questionText = row.getCell(0).getStringCellValue();
+                String questionText = dataFormatter.formatCellValue(row.getCell(0));
 
                 questionText = questionText.replaceFirst("^\\s*\\d+\\.\\s*", "");
 
                 List<String> choices = new LinkedList<>();
                 for (int i = 1; i <= 6; i++) {
                     Cell choiceCell = row.getCell(i);
-                    if (choiceCell != null && choiceCell.getCellType() == CellType.STRING && !choiceCell.getStringCellValue().trim().isEmpty()) {
-                        choices.add(choiceCell.getStringCellValue().trim());
+                    if (choiceCell != null && !dataFormatter.formatCellValue(choiceCell).trim().isEmpty()) {
+                        choices.add(dataFormatter.formatCellValue(choiceCell).trim());
                     }
                 }
-                String choicesString = choices.stream().collect(Collectors.joining(","));
+                String choicesString = choices.stream().collect(Collectors.joining("|"));
 
-                String correctAnswer = row.getCell(7).getStringCellValue();
-                String explanation = row.getCell(8).getStringCellValue();
-                String classification = row.getCell(9).getStringCellValue();
+                String correctAnswer = dataFormatter.formatCellValue(row.getCell(7));
+                String explanation = dataFormatter.formatCellValue(row.getCell(8));
+                String classification = dataFormatter.formatCellValue(row.getCell(9));
 
                 Question question = new Question(questionText, choicesString, correctAnswer, explanation, classification);
                 questionRepository.save(question);
