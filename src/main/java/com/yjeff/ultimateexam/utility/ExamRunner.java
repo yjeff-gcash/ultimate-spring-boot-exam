@@ -234,12 +234,12 @@ public class ExamRunner implements CommandLineRunner {
     }
 
     private boolean processAnswer(Question question, String userAnswer) {
-        List<String> correctAnswers = Stream.of(question.getCorrectAnswer().split("\\|"))
+        List<String> correctAnswers = Stream.of(question.getCorrectAnswer().replace(" ", "").split(","))
                 .map(String::trim)
                 .map(String::toLowerCase)
                 .collect(Collectors.toList());
 
-        List<String> userAnswers = Stream.of(userAnswer.split(","))
+        List<String> userAnswers = Stream.of(userAnswer.replace(" ", "").split(","))
                 .map(String::trim)
                 .map(String::toLowerCase)
                 .collect(Collectors.toList());
