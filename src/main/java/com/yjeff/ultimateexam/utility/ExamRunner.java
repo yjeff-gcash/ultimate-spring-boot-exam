@@ -5,13 +5,24 @@ import com.yjeff.ultimateexam.model.Score;
 import com.yjeff.ultimateexam.repository.QuestionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -184,40 +195,37 @@ public class ExamRunner implements CommandLineRunner {
         System.out.println("  2) Medium");
         System.out.println("  3) Hard");
         System.out.println("  4) Random (Mix of Easy, Medium, Hard)");
-        System.out.println("  5) Dump (Its a surprise!)");
+        System.out.println("  5) Dump (Close to the real exam)");
         System.out.print("Enter your choice: ");
 
         String choice = scanner.nextLine().trim().toLowerCase();
-        List<Question> questions;
+        Set<Question> uniqueQuestions = new HashSet<>();
 
         switch (choice) {
             case "1", "easy":
-                questions = questionRepository.findByClassification("Easy");
+                uniqueQuestions.addAll(questionRepository.findByClassification("Easy"));
                 break;
             case "2", "medium":
-                questions = questionRepository.findByClassification("Medium");
+                uniqueQuestions.addAll(questionRepository.findByClassification("Medium"));
                 break;
             case "3", "hard":
-                questions = questionRepository.findByClassification("Hard");
+                uniqueQuestions.addAll(questionRepository.findByClassification("Hard"));
                 break;
             case "4", "random":
-                List<Question> easyQuestions = questionRepository.findByClassification("Easy");
-                List<Question> mediumQuestions = questionRepository.findByClassification("Medium");
-                List<Question> hardQuestions = questionRepository.findByClassification("Hard");
-
-                questions = Stream.of(easyQuestions, mediumQuestions, hardQuestions)
-                        .flatMap(List::stream)
-                        .collect(Collectors.toList());
+                uniqueQuestions.addAll(questionRepository.findByClassification("Easy"));
+                uniqueQuestions.addAll(questionRepository.findByClassification("medium"));
+                uniqueQuestions.addAll(questionRepository.findByClassification("Hard"));
                 break;
             case "5", "dump":
-                questions = questionRepository.findByClassification("Dump");
+                uniqueQuestions.addAll(questionRepository.findByClassification("Dump"));
                 break;
             default:
                 System.out.println("Invalid choice. Running a full exam.");
-                questions = questionRepository.findAll();
+                uniqueQuestions.addAll(questionRepository.findAll());
                 break;
         }
 
+        List<Question> questions = new ArrayList<>(uniqueQuestions);
         Collections.shuffle(questions);
 
         int limit = Math.min(questions.size(), 60);
@@ -226,7 +234,20 @@ public class ExamRunner implements CommandLineRunner {
     }
 
     private void askQuestion(Question question) {
-        System.out.println(formatCodeSnippets(question.getQuestionText()));
+        String[] codeBlockParts = question.getQuestionText().split("```");
+        for (int i = 0; i < codeBlockParts.length; i++) {
+            if (i % 2 == 0) {
+                System.out.println(wordWrap(codeBlockParts[i], MAX_LINE_WIDTH));
+            } else {
+                System.out.println();
+                String[] lines = codeBlockParts[i].split("\n");
+                for (String line : lines) {
+                    System.out.println("    " + line.trim());
+                }
+                System.out.println();
+            }
+        }
+
         String[] choices = question.getChoices().split("\\|");
         for (int i = 0; i < choices.length; i++) {
             System.out.println("  " + (char)('A' + i) + ") " + choices[i].trim());
@@ -265,24 +286,6 @@ public class ExamRunner implements CommandLineRunner {
         } catch (IOException e) {
             System.err.println("An error occurred while saving the score: " + e.getMessage());
         }
-    }
-
-    private String formatCodeSnippets(String text) {
-        if (text.contains("\n")) {
-            return "\n" + text;
-        }
-
-        String[] parts = text.split("`");
-        StringBuilder formattedText = new StringBuilder();
-
-        for (int i = 0; i < parts.length; i++) {
-            if (i % 2 != 0) {
-                formattedText.append("`").append(parts[i].trim()).append("`");
-            } else {
-                formattedText.append(wordWrap(parts[i], MAX_LINE_WIDTH));
-            }
-        }
-        return formattedText.toString();
     }
 
     private String wordWrap(String text, int maxWidth) {
